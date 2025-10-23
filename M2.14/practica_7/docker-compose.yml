@@ -1,0 +1,21 @@
+services:
+  monitor:
+    build: .
+    image: telegram-monitor:latest
+    container_name: telegram_monitor
+    env_file: ./env/.env         # archivo con API_ID, API_HASH, etc.
+    volumes:
+      - ./data/downloads:/app/downloads   # archivos descargados
+      - ./data/state:/app/state           # sesiones / alertas
+    restart: unless-stopped
+    user: "1000:1000"         # ejecuta como UID no-root (ajusta a tu host)
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "monitor.py"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
