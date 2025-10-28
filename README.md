@@ -201,7 +201,7 @@ Generará correlated.json, que contendrá la validación de correos (Hunter) y e
 Convierte los resultados JSON a formato CSV (fácil de abrir en Excel):
 ```sh
 python save_csv.py --input correlated.json --output resultados.csv
-```
+``
 
 Esto creará un archivo resultados.csv con columnas como:
 
@@ -230,7 +230,7 @@ Tras ejecutar los tres scripts, deberías tener:
 ├── correlated.json
 ├── resultados.csv
 └── .env
-``
+```
 ### 🧠 8. Qué se aprende
 
 ✔️ A procesar leaks simulados sin usar expresiones regulares
