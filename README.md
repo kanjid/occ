@@ -117,6 +117,7 @@ Aprenderás a extraer entidades, correlacionarlas con fuentes OSINT reales (Hunt
 
 Copia estos archivos en una misma carpeta:
 
+```sh
 /leaks_practica
 │
 ├── leak_sample.json        # Datos de ejemplo
@@ -125,7 +126,7 @@ Copia estos archivos en una misma carpeta:
 ├── save_csv.py             # Exporta los datos finales a formato CSV
 ├── .env.example            # Plantilla de variables de entorno
 └── requirements.txt        # Librerías necesarias
-
+```
 ### 📦 2. Instalación
 
 Asegúrate de tener Python 3.10 o superior instalado.
@@ -136,25 +137,30 @@ python -m venv venv
 source venv/bin/activate       # En Linux/Mac
 venv\Scripts\activate.ps1      # En Windows
 
+```sh
 pip install -r requirements.txt
-
+```
 
 💡 Si no tienes el archivo requirements.txt, instala manualmente:
 
+```sh
 pip install python-dotenv requests email-validator phonenumbers urlextract tldextract
+```
 
 ### 🔐 3. Configurar el archivo .env
 
 Copia el archivo de ejemplo (si no está crealo tú mismo con notepad - recuerda que al tener el . delante puede estar oculto):
 
+```sh
 cp .env.example .env
-
+```
 
 Abre .env y reemplaza los valores por tus claves personales:
 
+```sh
 HUNTER_API_KEY=TU_API_KEY_DE_HUNTER
 URLSCAN_API_KEY=TU_API_KEY_DE_URLSCAN
-
+```
 
 Guarda el archivo y ciérralo.
 
@@ -216,7 +222,7 @@ Esto creará un archivo resultados.csv con columnas como:
 ### 📘 7. Archivos finales esperados
 
 Tras ejecutar los tres scripts, deberías tener:
-
+```sh
 /leaks_practica
 │
 ├── leak_sample.json
@@ -224,7 +230,7 @@ Tras ejecutar los tres scripts, deberías tener:
 ├── correlated.json
 ├── resultados.csv
 └── .env
-
+```
 ### 🧠 8. Qué se aprende
 
 ✔️ A procesar leaks simulados sin usar expresiones regulares
