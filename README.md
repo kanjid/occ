@@ -169,9 +169,9 @@ Guarda el archivo y ciérralo.
 ### 🧩 4. Paso 1 — Extracción de entidades
 
 Ejecuta el primer script para analizar el JSON:
-
+```sh
 python extract_entities.py --input leak_sample.json --output entities.json
-
+```
 
 Esto creará un nuevo archivo entities.json con los emails, teléfonos, dominios, URLs y menciones encontradas en los mensajes.
 
@@ -183,9 +183,9 @@ Ejemplo de salida:
 ### 🌐 5. Paso 2 — Correlación OSINT
 
 Correlaciona los datos extraídos con Hunter.io y URLScan.io:
-
+```sh
 python correlate_osint.py --input entities.json --output correlated.json --limit 10
-
+```
 
 🔹 Este paso usa tus claves del .env.
 🔹 Solo se procesarán 10 registros (para evitar límites de API).
@@ -199,9 +199,9 @@ Generará correlated.json, que contendrá la validación de correos (Hunter) y e
 ### 📊 6. Paso 3 — Guardar resultados en CSV
 
 Convierte los resultados JSON a formato CSV (fácil de abrir en Excel):
-
+```sh
 python save_csv.py --input correlated.json --output resultados.csv
-
+```
 
 Esto creará un archivo resultados.csv con columnas como:
 
@@ -230,7 +230,7 @@ Tras ejecutar los tres scripts, deberías tener:
 ├── correlated.json
 ├── resultados.csv
 └── .env
-```
+``
 ### 🧠 8. Qué se aprende
 
 ✔️ A procesar leaks simulados sin usar expresiones regulares
