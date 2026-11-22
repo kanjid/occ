@@ -277,15 +277,18 @@ sleep 5
 # una BD limpia se aplican completas. Pueden aparecer trazas de tareas internas
 # que se disparan mientras se crean las tablas: son inofensivas.
 step "Aplicando migraciones de la base de datos"
-run "cd '$DEP' && docker compose exec -T watcher python manage.py migrate --no-input" \
+run "cd '$DEP' && timeout 600 docker compose exec -T watcher python manage.py migrate --no-input" \
     && ok "Base de datos migrada." \
     || warn "La migración devolvió un aviso; revisa la salida de arriba."
 
 # Usuario administrador: por el shell de Django, rellenando 'last_login'
-# explícitamente para evitar el error 'last_login cannot be null'.
+# explícitamente (evita 'last_login cannot be null'). Capturamos la salida en una
+# variable (no usamos '| grep', que con pipefail podía fallar/colgarse) y ponemos
+# un 'timeout' de seguridad para que el instalador nunca se quede atascado aquí.
 step "Creando el usuario administrador por defecto"
 PY="from django.contrib.auth import get_user_model; from django.utils import timezone; U=get_user_model(); U.objects.filter(username='${ADMIN_USER}').delete(); u=U(username='${ADMIN_USER}', email='${ADMIN_EMAIL}', is_staff=True, is_superuser=True, is_active=True, last_login=timezone.now()); u.set_password('${ADMIN_PASS}'); u.save(); print('SUPERUSER_OK')"
-if run "cd '$DEP' && docker compose exec -T watcher python manage.py shell -c \"$PY\"" 2>/dev/null | grep -q 'SUPERUSER_OK'; then
+SU_OUT="$(run "cd '$DEP' && timeout 120 docker compose exec -T watcher python manage.py shell -c \"$PY\"" 2>/dev/null || true)"
+if printf '%s' "$SU_OUT" | grep -q 'SUPERUSER_OK'; then
     ok "Usuario '$ADMIN_USER' listo."
 else
     warn "No pude crear el usuario automáticamente; créalo luego (ver README)."
@@ -293,7 +296,7 @@ fi
 
 # Poblar la base de datos (incluye 218 fuentes RSS, con varios CERT).
 step "Sembrando fuentes RSS y datos iniciales (Práctica 3 lista)"
-run "cd '$DEP' && docker compose exec -T watcher python manage.py populate_db" >/dev/null 2>&1 \
+run "cd '$DEP' && timeout 300 docker compose exec -T watcher python manage.py populate_db" >/dev/null 2>&1 \
     && ok "Fuentes RSS cargadas (CERT-FR, US-CERT/CISA, INCIBE-CERT, CCN-CERT…)." \
     || warn "No pude ejecutar populate_db ahora; puedes relanzar el instalador."
 
