@@ -235,22 +235,29 @@ ok "Imagen lista."
 
 step "Inicializando y levantando Watcher (esto tarda un poco la primera vez)"
 run "cd '$DEP' && make init"
-run "cd '$DEP' && make up"
-ok "Contenedores arrancados."
+# 'make up' puede devolver error si MySQL tarda en inicializar: el contenedor
+# 'watcher' no arranca hasta que la BD pasa su healthcheck, y el PRIMER arranque
+# de MySQL puede superar ese margen. No es fatal: esperamos a la BD y reintentamos.
+run "cd '$DEP' && make up" || warn "Arranque parcial (la BD aún inicializa); espero y reintento."
 
-# Esperar a que MySQL esté LISTO (su primer arranque tarda ~50 s). Migrar antes
-# de que la BD esté sana deja el esquema a medias, que fue el origen de los fallos.
-step "Esperando a que la base de datos esté lista"
+# Esperar a que MySQL esté SANO. Migrar antes de que la BD esté lista deja el
+# esquema a medias (origen de los fallos). El primer arranque puede tardar 1-2 min.
+step "Esperando a que la base de datos esté lista (su primer arranque tarda)"
 DB_OK=0
-for _ in $(seq 1 60); do
+for _ in $(seq 1 60); do   # hasta ~5 min
     if run "cd '$DEP' && docker compose ps db_watcher" 2>/dev/null | grep -q healthy; then
         DB_OK=1; break
     fi
     sleep 5
 done
-[ "$DB_OK" -eq 1 ] && ok "Base de datos lista." || warn "La BD tardó en responder; continúo igualmente."
+[ "$DB_OK" -eq 1 ] && ok "Base de datos lista." || warn "La BD tardó mucho; continúo igualmente."
+
+# Reintento idempotente: ahora que la BD está sana, arranca 'watcher' si 'make up'
+# no llegó a hacerlo por el race anterior.
+run "cd '$DEP' && docker compose up -d" >/dev/null 2>&1 || true
 
 # Esperar a que el contenedor de la aplicación esté en marcha.
+step "Esperando a que la aplicación arranque"
 for _ in $(seq 1 30); do
     run "cd '$DEP' && docker compose ps --status running" 2>/dev/null | grep -q '\bwatcher\b' && break
     sleep 5
