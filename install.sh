@@ -205,6 +205,11 @@ DEP="$WATCHER_DIR/deployment"
 # repositorio; se lo damos para que 'make down/up' funcionen más adelante.
 chmod +x "$DEP"/scripts/*.sh 2>/dev/null || true
 
+# El PRIMER arranque de MySQL puede tardar >50 s; su healthcheck por defecto es
+# demasiado impaciente y Compose aborta 'watcher'. Ampliamos su margen a 180 s
+# (solo la BD usa start_period: 30s; 'watcher' usa 60s, no se toca).
+sed -i 's/start_period: 30s/start_period: 180s/' "$DEP/docker-compose.yml" 2>/dev/null || true
+
 # Preparar .env (solo la primera vez, para no pisar secretos ya generados)
 if [ ! -f "$DEP/.env" ]; then
     cp "$DEP/.env.example" "$DEP/.env"
@@ -252,16 +257,20 @@ for _ in $(seq 1 60); do   # hasta ~5 min
 done
 [ "$DB_OK" -eq 1 ] && ok "Base de datos lista." || warn "La BD tardó mucho; continúo igualmente."
 
-# Reintento idempotente: ahora que la BD está sana, arranca 'watcher' si 'make up'
-# no llegó a hacerlo por el race anterior.
-run "cd '$DEP' && docker compose up -d" >/dev/null 2>&1 || true
-
-# Esperar a que el contenedor de la aplicación esté en marcha.
-step "Esperando a que la aplicación arranque"
-for _ in $(seq 1 30); do
-    run "cd '$DEP' && docker compose ps --status running" 2>/dev/null | grep -q '\bwatcher\b' && break
-    sleep 5
+# Ahora que la BD está sana, nos aseguramos de que 'watcher' arranca (si el race
+# anterior lo dejó sin levantar): reintentamos el 'up' y verificamos.
+step "Asegurando que la aplicación está arrancada"
+APP_OK=0
+for _ in $(seq 1 6); do
+    run "cd '$DEP' && docker compose up -d" >/dev/null 2>&1 || true
+    sleep 8
+    if run "cd '$DEP' && docker compose ps --status running" 2>/dev/null | grep -q '\bwatcher\b'; then
+        APP_OK=1; break
+    fi
+    sleep 7
 done
+[ "$APP_OK" -eq 1 ] && ok "Aplicación en marcha." \
+    || warn "La aplicación no arrancó; revisa con: docker compose logs watcher"
 sleep 5
 
 # Migraciones: exec directo (los scripts del Makefile no traen permiso +x). Sobre
