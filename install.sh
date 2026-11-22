@@ -227,6 +227,7 @@ if [ ! -f "$DEP/.env" ]; then
         -e "s|^DJANGO_SECRET_KEY=.*|DJANGO_SECRET_KEY=${SECRET}|" \
         -e "s|^DB_PASSWORD=.*|DB_PASSWORD=\"${DBPASS}\"|" \
         -e "s|^DB_ROOT_PASSWORD=.*|DB_ROOT_PASSWORD=\"${DBROOT}\"|" \
+        -e "s|^DATA_LEAK_SEARX_URL=.*|DATA_LEAK_SEARX_URL=http://searxng:8080/|" \
         "$DEP/.env"
     ok "Configuración (.env) generada con secretos propios de esta VM."
 else
