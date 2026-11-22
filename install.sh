@@ -238,30 +238,44 @@ run "cd '$DEP' && make init"
 run "cd '$DEP' && make up"
 ok "Contenedores arrancados."
 
-# Esperar a que el contenedor de la app esté en marcha
-step "Esperando a que Watcher responda"
-for _ in $(seq 1 30); do
-    if run "cd '$DEP' && docker compose ps --status running" 2>/dev/null | grep -q '\bwatcher\b'; then
-        break
+# Esperar a que MySQL esté LISTO (su primer arranque tarda ~50 s). Migrar antes
+# de que la BD esté sana deja el esquema a medias, que fue el origen de los fallos.
+step "Esperando a que la base de datos esté lista"
+DB_OK=0
+for _ in $(seq 1 60); do
+    if run "cd '$DEP' && docker compose ps db_watcher" 2>/dev/null | grep -q healthy; then
+        DB_OK=1; break
     fi
+    sleep 5
+done
+[ "$DB_OK" -eq 1 ] && ok "Base de datos lista." || warn "La BD tardó en responder; continúo igualmente."
+
+# Esperar a que el contenedor de la aplicación esté en marcha.
+for _ in $(seq 1 30); do
+    run "cd '$DEP' && docker compose ps --status running" 2>/dev/null | grep -q '\bwatcher\b' && break
     sleep 5
 done
 sleep 5
 
-# Migraciones (exec directo en el contenedor, sin depender de make/scripts)
-run "cd '$DEP' && docker compose exec -T watcher python manage.py migrate" \
+# Migraciones: exec directo (los scripts del Makefile no traen permiso +x). Sobre
+# una BD limpia se aplican completas. Pueden aparecer trazas de tareas internas
+# que se disparan mientras se crean las tablas: son inofensivas.
+step "Aplicando migraciones de la base de datos"
+run "cd '$DEP' && docker compose exec -T watcher python manage.py migrate --no-input" \
     && ok "Base de datos migrada." \
-    || warn "La migración devolvió un aviso; revísalo si el panel no carga."
+    || warn "La migración devolvió un aviso; revisa la salida de arriba."
 
-# Superusuario (no interactivo)
+# Usuario administrador: por el shell de Django, rellenando 'last_login'
+# explícitamente para evitar el error 'last_login cannot be null'.
 step "Creando el usuario administrador por defecto"
-if run "cd '$DEP' && docker compose exec -T -e DJANGO_SUPERUSER_PASSWORD='$ADMIN_PASS' watcher python manage.py createsuperuser --username '$ADMIN_USER' --email '$ADMIN_EMAIL' --noinput" >/dev/null 2>&1; then
-    ok "Usuario '$ADMIN_USER' creado."
+PY="from django.contrib.auth import get_user_model; from django.utils import timezone; U=get_user_model(); U.objects.filter(username='${ADMIN_USER}').delete(); u=U(username='${ADMIN_USER}', email='${ADMIN_EMAIL}', is_staff=True, is_superuser=True, is_active=True, last_login=timezone.now()); u.set_password('${ADMIN_PASS}'); u.save(); print('SUPERUSER_OK')"
+if run "cd '$DEP' && docker compose exec -T watcher python manage.py shell -c \"$PY\"" 2>/dev/null | grep -q 'SUPERUSER_OK'; then
+    ok "Usuario '$ADMIN_USER' listo."
 else
-    warn "El usuario '$ADMIN_USER' probablemente ya existía; no lo toco."
+    warn "No pude crear el usuario automáticamente; créalo luego (ver README)."
 fi
 
-# Poblar la base de datos (incluye los 218 feeds RSS, con CERTs)
+# Poblar la base de datos (incluye 218 fuentes RSS, con varios CERT).
 step "Sembrando fuentes RSS y datos iniciales (Práctica 3 lista)"
 run "cd '$DEP' && docker compose exec -T watcher python manage.py populate_db" >/dev/null 2>&1 \
     && ok "Fuentes RSS cargadas (CERT-FR, US-CERT/CISA, INCIBE-CERT, CCN-CERT…)." \
