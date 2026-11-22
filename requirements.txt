@@ -1,0 +1,7 @@
+# OCC · Dependencias de Python para los scripts de M2.12 (CTF) y M2.14 (OSINT Telegram)
+# Instaladas por install.sh dentro de ~/occ/.venv
+
+telethon>=1.36      # Cliente MTProto de Telegram (prácticas M2.14)
+pandas>=2.0         # Análisis de los datos exportados (data.py, analisys.py)
+matplotlib>=3.7     # Gráficas de actividad y dominios (analisys.py)
+requests>=2.31      # Consultas HTTP (CTF M2.12 y utilidades)

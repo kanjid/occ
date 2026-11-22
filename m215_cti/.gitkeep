@@ -1,0 +1,3 @@
+# Marcador para conservar esta carpeta vacía en Git.
+# El instalador (install.sh) clona aquí Watcher en tiempo de instalación:
+#   m215_cti/watcher/   (ignorado por .gitignore, no se versiona)

@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Telegram Threat Hunting Console · OCC M2.12</title>
+<style>
+  :root{
+    --bg:#0b0e11; --panel:#12161c; --panel2:#171c23; --line:#232a33;
+    --ink:#e6e8ea; --muted:#8b949e; --dim:#5c6672;
+    --lime:#a3e635; --lime-dim:#6f9e1f;
+    --crit:#ff5c5c; --crit-bg:#2a1416; --warn:#f2b64c; --good:#4ade80;
+    --mono:"DejaVu Sans Mono","Liberation Mono",Consolas,Menlo,monospace;
+    --sans:"DejaVu Sans","Liberation Sans",system-ui,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5}
+  a{color:var(--lime)}
+  .wrap{max-width:1280px;margin:0 auto;padding:0 20px 60px}
+  code,.mono{font-family:var(--mono)}
+  /* header */
+  header{border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0e1318,#0b0e11);position:sticky;top:0;z-index:20}
+  .hbar{max-width:1280px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .brand{font-family:var(--mono);font-weight:700;letter-spacing:.5px;font-size:15px}
+  .brand .g{color:var(--lime)}
+  .env{font-family:var(--mono);color:var(--muted);font-size:12px}
+  .spacer{flex:1}
+  .badge{font-family:var(--mono);font-size:11px;padding:4px 10px;border-radius:4px;border:1px solid var(--line);color:var(--muted)}
+  .badge.sim{border-color:var(--warn);color:var(--warn)}
+  .pulse{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--crit);margin-right:7px;animation:p 1.4s infinite}
+  @keyframes p{0%,100%{opacity:1}50%{opacity:.3}}
+  /* kpis */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:22px 0}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px 18px}
+  .kpi .n{font-family:var(--mono);font-size:30px;font-weight:700;line-height:1}
+  .kpi .l{color:var(--muted);font-size:12px;margin-top:8px;text-transform:uppercase;letter-spacing:.6px}
+  .kpi.crit .n{color:var(--crit)}
+  .kpi.lime .n{color:var(--lime)}
+  /* layout */
+  .cols{display:grid;grid-template-columns:340px 1fr;gap:18px;align-items:start}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px}
+  .card h2{font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:0;padding:14px 16px;border-bottom:1px solid var(--line);font-weight:600}
+  .card .body{padding:14px 16px}
+  /* alert queue */
+  .alert{border:1px solid var(--line);border-left:3px solid var(--crit);border-radius:6px;padding:11px 12px;margin-bottom:10px;cursor:pointer;background:var(--panel2);transition:border-color .15s}
+  .alert:hover{border-color:var(--lime)}
+  .alert.active{border-color:var(--lime);box-shadow:inset 0 0 0 1px var(--lime-dim)}
+  .alert .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .sev{font-family:var(--mono);font-size:10px;font-weight:700;padding:2px 7px;border-radius:3px;background:var(--crit-bg);color:var(--crit);border:1px solid #522}
+  .alert .host{font-family:var(--mono);font-weight:700;font-size:13px}
+  .alert .ttp{font-family:var(--mono);color:var(--muted);font-size:11px;margin-top:6px}
+  .alert .ago{color:var(--dim);font-size:11px;font-family:var(--mono)}
+  /* tabs */
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:0;flex-wrap:wrap}
+  .tab{font-family:var(--mono);font-size:12.5px;padding:11px 15px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;user-select:none}
+  .tab:hover{color:var(--ink)}
+  .tab.active{color:var(--lime);border-bottom-color:var(--lime)}
+  .pane{display:none}
+  .pane.active{display:block}
+  .pane .intro{color:var(--muted);font-size:13px;padding:14px 16px 4px}
+  .ttps{display:flex;gap:6px;flex-wrap:wrap;padding:0 16px 12px}
+  .chip{font-family:var(--mono);font-size:11px;padding:3px 8px;border:1px solid var(--line);border-radius:4px;color:var(--muted)}
+  .chip.red{border-color:#522;color:var(--crit)}
+  /* table */
+  .tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+  .tbl th{font-family:var(--mono);text-align:left;color:var(--dim);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px;padding:9px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+  .tbl td{padding:10px 12px;border-bottom:1px solid var(--line);font-family:var(--mono);vertical-align:top}
+  .tbl tr:last-child td{border-bottom:none}
+  .tbl tr.bad{background:var(--crit-bg)}
+  .tbl tr.bad td:first-child{box-shadow:inset 3px 0 0 var(--crit)}
+  .tbl tr.benign td{color:var(--muted)}
+  .pill{font-family:var(--mono);font-size:10px;font-weight:700;padding:2px 7px;border-radius:3px;white-space:nowrap}
+  .pill.crit{background:var(--crit-bg);color:var(--crit);border:1px solid #522}
+  .pill.ok{background:#14241a;color:var(--good);border:1px solid #244}
+  .num{text-align:right}
+  .hl{color:var(--crit);font-weight:700}
+  /* bar chart */
+  .chart{padding:8px 16px 18px}
+  .bar-row{display:flex;align-items:center;gap:10px;margin:9px 0;font-family:var(--mono);font-size:12px}
+  .bar-row .name{width:120px;color:var(--muted)}
+  .bar-track{flex:1;background:var(--panel2);border-radius:3px;height:22px;position:relative;overflow:hidden;border:1px solid var(--line)}
+  .bar-fill{position:absolute;left:0;top:0;bottom:0;min-width:3px;background:var(--lime-dim);opacity:.85}
+  .bar-fill.crit{background:var(--crit);opacity:.95}
+  .bar-val{width:82px;text-align:right}
+  .thresh{position:absolute;top:0;bottom:0;border-left:1px dashed var(--warn);opacity:.7}
+  /* host grid */
+  .hosts{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+  .host-card{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:12px;font-family:var(--mono)}
+  .host-card.bad{border-color:#522}
+  .host-card .hn{font-weight:700;font-size:13px}
+  .host-card .role{color:var(--dim);font-size:11px;margin:3px 0 9px}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+  .dot.red{background:var(--crit)} .dot.green{background:var(--good)}
+  .host-card .st{font-size:11px}
+  /* detail */
+  .detail{font-size:13px}
+  .detail .kv{display:grid;grid-template-columns:140px 1fr;gap:4px 12px;font-family:var(--mono);font-size:12.5px;margin:10px 0}
+  .detail .kv .k{color:var(--dim)}
+  .detail .lineage{font-family:var(--mono);font-size:12.5px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:12px;margin-top:10px;white-space:pre-wrap;overflow-x:auto}
+  .detail .arrow{color:var(--crit)}
+  /* two-col sections */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px}
+  @media(max-width:980px){.cols{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,1fr)}.hosts{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}.detail .kv{grid-template-columns:1fr}}
+  /* IR checklist */
+  .ir li{list-style:none;margin:0 0 4px;padding:0}
+  .ir label{display:flex;gap:10px;align-items:flex-start;cursor:pointer;padding:8px 10px;border-radius:6px}
+  .ir label:hover{background:var(--panel2)}
+  .ir input{margin-top:3px;accent-color:var(--lime);width:15px;height:15px}
+  .ir .done span{text-decoration:line-through;color:var(--dim)}
+  .mono-sm{font-family:var(--mono);font-size:11px;color:var(--dim)}
+  footer{color:var(--dim);font-size:12px;margin-top:30px;border-top:1px solid var(--line);padding-top:16px;font-family:var(--mono)}
+  .rule{font-family:var(--mono);font-size:11.5px;background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--lime-dim);border-radius:4px;padding:10px 12px;margin:8px 0;color:var(--muted);white-space:pre-wrap;overflow-x:auto}
+  .sectitle{font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:26px 0 12px;font-weight:600}
+</style>
+</head>
+<body>
+<header>
+  <div class="hbar">
+    <span class="brand">TELEGRAM THREAT HUNTING <span class="g">CONSOLE</span></span>
+    <span class="env">OCC &middot; M2.12 &middot; /lab/telegram-hunt</span>
+    <span class="spacer"></span>
+    <span class="badge"><span id="clock">--:--:--</span></span>
+    <span class="badge">ventana: 24h</span>
+    <span class="badge">hosts: 5</span>
+    <span class="badge sim">&#9888; DATOS SIMULADOS &middot; LABORATORIO</span>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="kpis">
+    <div class="kpi"><div class="n" id="kEvents">0</div><div class="l">Eventos analizados</div></div>
+    <div class="kpi crit"><div class="n"><span class="pulse"></span>3</div><div class="l">Alertas críticas</div></div>
+    <div class="kpi crit"><div class="n">3</div><div class="l">Hosts comprometidos</div></div>
+    <div class="kpi lime"><div class="n">2</div><div class="l">Hosts limpios</div></div>
+  </div>
+
+  <div class="cols">
+    <!-- LEFT: alert queue -->
+    <div class="card" style="position:sticky;top:70px">
+      <h2>Cola de triaje &middot; alertas activas</h2>
+      <div class="body" id="queue"></div>
+    </div>
+
+    <!-- RIGHT: detail + practice tabs -->
+    <div>
+      <div class="card" style="margin-bottom:18px">
+        <h2>Detalle del hallazgo seleccionado</h2>
+        <div class="body detail" id="detail"></div>
+      </div>
+
+      <div class="card">
+        <div class="tabs" id="tabs">
+          <div class="tab active" data-p="p1">P1 &middot; Caza de C2</div>
+          <div class="tab" data-p="p2">P2 &middot; Distribución de malware</div>
+          <div class="tab" data-p="p3">P3 &middot; Exfiltración asimétrica</div>
+        </div>
+
+        <!-- P1 -->
+        <div class="pane active" id="p1">
+          <div class="intro">Peticiones a <code>api.telegram.org</code> agrupadas por host, proceso, ruta y User-Agent. Se marca como C2 un binario no autorizado en ruta temporal con &gt;10 llamadas a <code>/getUpdates</code>.</div>
+          <div class="ttps"><span class="chip red">T1071.001</span><span class="chip red">T1102.002</span><span class="chip red">T1036</span></div>
+          <table class="tbl" id="t1"></table>
+        </div>
+
+        <!-- P2 -->
+        <div class="pane" id="p2">
+          <div class="intro">Linaje de procesos tras una descarga por <code>telegram.exe</code>. Alerta si engendra un intérprete de comandos con argumentos de evasión o escritura en claves <code>Run</code>.</div>
+          <div class="ttps"><span class="chip red">T1204.002</span><span class="chip red">T1059.001</span><span class="chip red">T1547.001</span></div>
+          <table class="tbl" id="t2"></table>
+        </div>
+
+        <!-- P3 -->
+        <div class="pane" id="p3">
+          <div class="intro">Asimetría volumétrica hacia <code>api.telegram.org</code>. Alerta si el ratio enviado/recibido &gt; 5,0 y el volumen saliente &gt; 10 MB en 24 h.</div>
+          <div class="ttps"><span class="chip red">T1048.003</span><span class="chip red">T1567.002</span></div>
+          <div class="chart" id="chart"></div>
+          <table class="tbl" id="t3"></table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HOSTS -->
+  <div class="sectitle">Parque de estaciones &middot; estado</div>
+  <div class="hosts" id="hosts"></div>
+
+  <!-- MITRE + IR -->
+  <div class="grid2">
+    <div class="card">
+      <h2>Matriz de detección MITRE ATT&amp;CK</h2>
+      <div class="body" style="padding:0">
+        <table class="tbl" id="mitre"></table>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Protocolo de respuesta (IR checklist)</h2>
+      <div class="body">
+        <ul class="ir" id="ir"></ul>
+        <div class="mono-sm" id="irCount" style="margin-top:8px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RULES -->
+  <div class="sectitle">Reglas de detección aplicadas</div>
+  <div class="rule">[P1 · C2]  destino == api.telegram.org  AND  proceso NOT IN (telegram.exe, chrome.exe, msedge.exe)
+          AND  ruta IN (ProgramData, %TEMP%)  AND  getUpdates > 10   =>  CRÍTICO</div>
+  <div class="rule">[P2 · Dropper]  proceso_padre == telegram.exe  AND  hijo IN (powershell.exe, cmd.exe, mshta.exe, wscript.exe)
+             AND  args LIKE (-WindowStyle Hidden | -Enc | reg add)   =>  CRÍTICO</div>
+  <div class="rule">[P3 · Exfil]  destino == api.telegram.org  AND  ratio(enviado/recibido) > 5.0  AND  MB_enviados > 10   =>  CRÍTICO</div>
+
+  <footer>
+    Consola de laboratorio con telemetría simulada conforme a Elastic Common Schema (ECS) y modelos de Microsoft Sentinel.
+    Uso exclusivamente docente &middot; OCC M2.12 Leaks. Ningún dato corresponde a sistemas, personas u organizaciones reales.
+  </footer>
+</div>
+
+<script>
+/* ============ DATOS SIMULADOS (consistentes con la guía de laboratorio) ============ */
+const EVENTS = 1060 + 2440 + 0; // P1 red + P3 red (P2 endpoint eventos incluidos en el relato)
+const hosts = [
+  {h:"WS01-FINANCE", role:"Finanzas", bad:false},
+  {h:"WS02-HR",      role:"RR. HH.",  bad:true},
+  {h:"WS03-DEV",     role:"Desarrollo",bad:true},
+  {h:"WS04-EXEC",    role:"Dirección",bad:true},
+  {h:"WS05-OPS",     role:"Operaciones",bad:false},
+];
+
+const p1 = [
+  {h:"WS01-FINANCE",proc:"chrome.exe",path:"C:\\Program Files\\Google\\Chrome\\",ua:"Mozilla/5.0",gu:106,sm:20,bad:false},
+  {h:"WS02-HR",proc:"telegram.exe",path:"C:\\Users\\ws02-hr\\AppData\\Local\\Telegram\\",ua:"TelegramDesktop/4.8.1",gu:53,sm:8,bad:false},
+  {h:"WS03-DEV",proc:"sysupdate.exe",path:"C:\\ProgramData\\SystemUpdate\\",ua:"CustomC2Client/1.0",gu:45,sm:15,bad:true},
+  {h:"WS04-EXEC",proc:"chrome.exe",path:"C:\\Program Files\\Google\\Chrome\\",ua:"Mozilla/5.0",gu:95,sm:22,bad:false},
+  {h:"WS05-OPS",proc:"msedge.exe",path:"C:\\Program Files (x86)\\Microsoft\\",ua:"Mozilla/5.0",gu:20,sm:7,bad:false},
+];
+
+const p2 = [
+  {h:"WS01-FINANCE",dl:"chrome.exe",file:"documento.docx",exe:"winword.exe",cmd:"winword.exe \"C:\\Users\\...\\documento.docx\"",bad:false},
+  {h:"WS02-HR",dl:"telegram.exe",file:"Update_Patch_v2.iso",exe:"powershell.exe",cmd:"powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -Enc JABzAD0ATg...",bad:true},
+  {h:"WS02-HR",dl:"telegram.exe",file:"payload.exe",exe:"cmd.exe",cmd:"cmd.exe /c reg add HKCU\\Software\\...\\Run /v Persistence /t REG_SZ /d ...",bad:true},
+  {h:"WS03-DEV",dl:"telegram.exe",file:"informe.pdf",exe:"acrord32.exe",cmd:"acrord32.exe \"C:\\Users\\...\\informe.pdf\"",bad:false},
+];
+
+const p3 = [
+  {h:"WS01-FINANCE",req:121,sent:0.09,recv:0.68,ratio:0.13,bad:false},
+  {h:"WS02-HR",req:120,sent:0.08,recv:0.72,ratio:0.12,bad:false},
+  {h:"WS03-DEV",req:129,sent:0.09,recv:0.68,ratio:0.14,bad:false},
+  {h:"WS04-EXEC",req:173,sent:76.54,recv:0.75,ratio:102.11,bad:true},
+  {h:"WS05-OPS",req:128,sent:0.09,recv:0.71,ratio:0.13,bad:false},
+];
+
+const alerts = [
+  {id:"a1",host:"WS03-DEV",sev:"CRÍTICO",title:"Bot C2 activo (estilo NineRAT)",ttp:"T1102.002 · Web Service / Bot API",ago:"hace 7 min",p:"p1",
+   kv:{"Proceso":"sysupdate.exe","Ruta":"C:\\ProgramData\\SystemUpdate\\","User-Agent":"CustomC2Client/1.0","/getUpdates":"45 (polling de comandos)","/sendMessage":"15 (exfiltración ligera)","Veredicto":"Implante C2 que simula una actualización del sistema"},
+   note:"Binario no firmado en ProgramData con polling recurrente a /getUpdates y un User-Agent no estándar. Patrón de comando y control asíncrono sobre la API de bots de Telegram."},
+  {id:"a2",host:"WS02-HR",sev:"CRÍTICO",title:"Dropper desde Telegram + persistencia",ttp:"T1204.002 · T1059.001 · T1547.001",ago:"hace 21 min",p:"p2",
+   kv:{"Descargador":"telegram.exe","Archivo":"Update_Patch_v2.iso","Ejecución":"powershell.exe -WindowStyle Hidden -Enc ...","Persistencia":"cmd.exe → reg add HKCU\\...\\Run","Veredicto":"Infección por dropper secundario con arranque automático"},
+   lineage:"telegram.exe\n  └─▶ Update_Patch_v2.iso (montada)\n        └─▶ powershell.exe  -WindowStyle Hidden -ExecutionPolicy Bypass -Enc JABzAD0ATg...\n              └─▶ cmd.exe  /c reg add HKCU\\...\\Run /v Persistence",
+   note:"Una descarga por telegram.exe desencadena PowerShell oculto que decodifica un payload en memoria y registra una clave Run para persistir."},
+  {id:"a3",host:"WS04-EXEC",sev:"CRÍTICO",title:"Exfiltración masiva asimétrica",ttp:"T1567.002 · Exfiltration Over Web Service",ago:"hace 33 min",p:"p3",
+   kv:{"Destino":"api.telegram.org","Volumen enviado":"76,54 MB","Volumen recibido":"0,75 MB","Ratio de asimetría":"102,11x","Endpoint":"/sendDocument × 40","User-Agent":"python-requests/2.31.0"},
+   note:"La estación de dirección envía más de 100 veces los datos que recibe mediante 40 invocaciones consecutivas a /sendDocument desde un script en Python."},
+];
+
+const mitre = [
+  {p:"P1",vec:"Bot C2 asíncrono",ttp:"T1071.001 · T1102.002 · T1036",foco:"Peticiones a Telegram desde procesos que no son el cliente oficial ni navegadores"},
+  {p:"P2",vec:"Dropper / malware",ttp:"T1204.002 · T1059.001 · T1547.001",foco:"Linaje telegram.exe → powershell.exe con -Enc o reg add"},
+  {p:"P3",vec:"Exfiltración de datos",ttp:"T1048.003 · T1567.002",foco:"Asimetría volumétrica saliente hacia api.telegram.org"},
+];
+
+const irSteps = [
+  "Aislar los endpoints alertados (WS02-HR, WS03-DEV, WS04-EXEC) vía agente EDR.",
+  "Revocar los tokens de bot de Telegram comprometidos y restablecer credenciales de los usuarios afectados.",
+  "Bloquear en el Web Proxy / NGFW el acceso a la API de Telegram desde hosts sin justificación operativa.",
+  "Extraer para sandbox: C:\\ProgramData\\SystemUpdate\\sysupdate.exe y los archivos de la carpeta Downloads.",
+];
+
+/* ============ RENDER ============ */
+const $=s=>document.querySelector(s), el=(t,c)=>{const e=document.createElement(t);if(c)e.className=c;return e;};
+$("#kEvents").textContent = EVENTS.toLocaleString("es-ES");
+
+// queue
+const q=$("#queue");
+alerts.forEach(a=>{
+  const d=el("div","alert");d.dataset.id=a.id;
+  d.innerHTML=`<div class="top"><span class="host">${a.host}</span><span class="sev">${a.sev}</span></div>
+    <div class="ttp">${a.title}</div><div class="ttp">${a.ttp}</div>
+    <div class="ago">${a.ago}</div>`;
+  d.onclick=()=>select(a.id);
+  q.appendChild(d);
+});
+
+function select(id){
+  const a=alerts.find(x=>x.id===id);
+  document.querySelectorAll(".alert").forEach(n=>n.classList.toggle("active",n.dataset.id===id));
+  const dv=$("#detail");
+  let html=`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+     <div><span class="host mono" style="font-weight:700;font-size:15px">${a.host}</span>
+     &nbsp;<span class="pill crit">${a.sev}</span></div>
+     <span class="mono-sm">${a.ago}</span></div>
+     <div style="font-weight:600;margin:8px 0 2px">${a.title}</div>
+     <div class="mono-sm">${a.ttp}</div>
+     <div class="kv">`;
+  for(const k in a.kv) html+=`<div class="k">${k}</div><div>${a.kv[k]}</div>`;
+  html+=`</div>`;
+  if(a.lineage) html+=`<div class="lineage">${a.lineage.replace(/▶/g,'<span class="arrow">▶</span>')}</div>`;
+  html+=`<div style="color:var(--muted);margin-top:12px">${a.note}</div>`;
+  dv.innerHTML=html;
+  // jump to relevant tab
+  switchTab(a.p);
+}
+
+// tabs
+function switchTab(p){
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.p===p));
+  document.querySelectorAll(".pane").forEach(n=>n.classList.toggle("active",n.id===p));
+}
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>switchTab(t.dataset.p));
+
+// P1 table
+$("#t1").innerHTML=`<tr><th>Host</th><th>Proceso</th><th>Ruta</th><th>User-Agent</th><th class="num">/getUpdates</th><th class="num">/sendMessage</th><th>Riesgo</th></tr>`+
+ p1.map(r=>`<tr class="${r.bad?'bad':'benign'}"><td>${r.h}</td><td>${r.bad?'<span class="hl">'+r.proc+'</span>':r.proc}</td>
+   <td>${r.path}</td><td>${r.ua}</td><td class="num">${r.gu}</td><td class="num">${r.sm}</td>
+   <td><span class="pill ${r.bad?'crit':'ok'}">${r.bad?'CRÍTICO':'benigno'}</span></td></tr>`).join("");
+
+// P2 table
+$("#t2").innerHTML=`<tr><th>Host</th><th>Descargador</th><th>Archivo</th><th>Proceso ejecutado</th><th>Línea de comandos</th><th>Riesgo</th></tr>`+
+ p2.map(r=>`<tr class="${r.bad?'bad':'benign'}"><td>${r.h}</td><td>${r.dl}</td><td>${r.file}</td>
+   <td>${r.bad?'<span class="hl">'+r.exe+'</span>':r.exe}</td><td style="max-width:360px;white-space:normal">${r.cmd}</td>
+   <td><span class="pill ${r.bad?'crit':'ok'}">${r.bad?'CRÍTICO':'benigno'}</span></td></tr>`).join("");
+
+// P3 chart + table
+const maxRatio=Math.max(...p3.map(r=>r.ratio));
+const logMax=Math.log10(maxRatio+1);
+$("#chart").innerHTML=`<div class="mono-sm" style="margin-bottom:6px">Ratio de asimetría (escala log) &middot; umbral de alerta = 5,0x</div>`+
+ p3.map(r=>{
+   const w=(Math.log10(r.ratio+1)/logMax*100).toFixed(1);
+   const tw=(Math.log10(5+1)/logMax*100).toFixed(1);
+   return `<div class="bar-row"><span class="name">${r.h}</span>
+     <span class="bar-track"><span class="bar-fill ${r.bad?'crit':''}" style="width:${w}%"></span>
+     <span class="thresh" style="left:${tw}%"></span></span>
+     <span class="bar-val ${r.bad?'hl':''}">${r.ratio.toFixed(2)}x</span></div>`;
+ }).join("");
+$("#t3").innerHTML=`<tr><th>Host</th><th>Destino</th><th class="num">Peticiones</th><th class="num">MB enviados</th><th class="num">MB recibidos</th><th class="num">Ratio</th><th>Riesgo</th></tr>`+
+ p3.map(r=>`<tr class="${r.bad?'bad':'benign'}"><td>${r.h}</td><td>api.telegram.org</td><td class="num">${r.req}</td>
+   <td class="num ${r.bad?'hl':''}">${r.sent.toFixed(2)}</td><td class="num">${r.recv.toFixed(2)}</td>
+   <td class="num ${r.bad?'hl':''}">${r.ratio.toFixed(2)}x</td>
+   <td><span class="pill ${r.bad?'crit':'ok'}">${r.bad?'CRÍTICO':'benigno'}</span></td></tr>`).join("");
+
+// hosts
+$("#hosts").innerHTML=hosts.map(h=>`<div class="host-card ${h.bad?'bad':''}">
+   <div class="hn">${h.h}</div><div class="role">${h.role}</div>
+   <div class="st"><span class="dot ${h.bad?'red':'green'}"></span>${h.bad?'COMPROMETIDO':'limpio'}</div></div>`).join("");
+
+// mitre
+$("#mitre").innerHTML=`<tr><th>Práctica</th><th>Vector</th><th>TTPs</th><th>Foco de detección</th></tr>`+
+ mitre.map(m=>`<tr><td>${m.p}</td><td>${m.vec}</td><td>${m.ttp}</td><td style="white-space:normal;color:var(--muted)">${m.foco}</td></tr>`).join("");
+
+// IR checklist
+const ir=$("#ir");
+irSteps.forEach((s,i)=>{
+  const li=el("li");
+  li.innerHTML=`<label><input type="checkbox" data-i="${i}"><span>${s}</span></label>`;
+  ir.appendChild(li);
+});
+function irCount(){
+  const done=document.querySelectorAll("#ir input:checked").length;
+  $("#irCount").textContent=`${done} / ${irSteps.length} acciones completadas`;
+}
+ir.addEventListener("change",e=>{
+  e.target.closest("label").classList.toggle("done",e.target.checked);
+  irCount();
+});
+irCount();
+
+// clock
+function tick(){const d=new Date();$("#clock").textContent=d.toLocaleTimeString("es-ES");}
+setInterval(tick,1000);tick();
+
+// default selection
+select("a1");
+</script>
+</body>
+</html>

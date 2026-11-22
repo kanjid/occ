@@ -1,0 +1,47 @@
+# =============================================================================
+#  OCC · .gitignore
+#  Evita subir al repositorio: credenciales, sesiones, salidas y Watcher.
+# =============================================================================
+
+# --- Watcher: se clona en tiempo de instalación, NO se versiona aquí ---
+m215_cti/watcher/
+
+# --- Entornos y cachés de Python ---
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# --- Sesiones y credenciales de Telegram (¡SENSIBLES! nunca subir) ---
+*.session
+*.session-journal
+api_credentials*
+config.ini
+secrets*
+
+# --- Variables de entorno y secretos ---
+.env
+*.env
+!.env.example
+
+# --- Salidas que generan las prácticas (datos, no código) ---
+msgs_data.json
+mensajes_*.json
+info_grupo.json
+alerts.jsonl
+*.jsonl
+descargas/
+salida/
+output/
+# Nota: los .csv/.png que generan los scripts de análisis conviene no subirlos;
+# guárdalos en 'salida/' o 'output/' y quedarán ignorados automáticamente.
+
+# --- Sistema operativo / editores ---
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
