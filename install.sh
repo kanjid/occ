@@ -85,24 +85,33 @@ ok "Utilidades base listas."
 # -------------------------- 2. Docker ---------------------------------------
 step "2/6 · Docker y Docker Compose"
 
+# En Kali, Docker se instala desde sus propios repositorios (docker.io):
+# el script oficial get.docker.com NO soporta 'kali-rolling' y falla.
 if ! command -v docker >/dev/null 2>&1; then
-    warn "Docker no está instalado. Instalando (puede tardar unos minutos)..."
-    curl -fsSL https://get.docker.com | $SUDO sh
-    ok "Docker instalado."
+    warn "Docker no está instalado. Instalando desde los repositorios de Kali..."
+    if $SUDO apt-get install -y -qq docker.io; then
+        ok "Docker instalado (docker.io)."
+    else
+        warn "No pude instalar 'docker.io'; probando el script oficial de Docker..."
+        curl -fsSL https://get.docker.com | $SUDO sh
+        ok "Docker instalado."
+    fi
 else
     ok "Docker ya está instalado."
 fi
 
-# Plugin de compose v2
-if ! docker compose version >/dev/null 2>&1; then
-    warn "Falta el plugin 'docker compose'. Instalando..."
-    $SUDO apt-get install -y -qq docker-compose-plugin 2>/dev/null \
-        || curl -fsSL https://get.docker.com | $SUDO sh
-    docker compose version >/dev/null 2>&1 \
-        && ok "Docker Compose disponible." \
-        || die "No se pudo habilitar 'docker compose'."
-else
+# Plugin de compose v2 (el subcomando 'docker compose')
+if docker compose version >/dev/null 2>&1; then
     ok "Docker Compose disponible."
+else
+    warn "Falta 'docker compose'. Instalando el plugin..."
+    $SUDO apt-get install -y -qq docker-compose-v2 2>/dev/null \
+        || $SUDO apt-get install -y -qq docker-compose-plugin 2>/dev/null || true
+    if docker compose version >/dev/null 2>&1; then
+        ok "Docker Compose disponible."
+    else
+        die "No se pudo habilitar 'docker compose'. Instala a mano: sudo apt install -y docker.io docker-compose-v2"
+    fi
 fi
 
 # Arrancar el demonio
