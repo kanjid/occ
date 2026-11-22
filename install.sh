@@ -201,6 +201,9 @@ fi
 
 DEP="$WATCHER_DIR/deployment"
 [ -d "$DEP" ] || die "No encuentro el directorio de despliegue de Watcher."
+# Los scripts del Makefile de Watcher vienen sin permiso de ejecución en el
+# repositorio; se lo damos para que 'make down/up' funcionen más adelante.
+chmod +x "$DEP"/scripts/*.sh 2>/dev/null || true
 
 # Preparar .env (solo la primera vez, para no pisar secretos ya generados)
 if [ ! -f "$DEP/.env" ]; then
@@ -245,8 +248,9 @@ for _ in $(seq 1 30); do
 done
 sleep 5
 
-# Migraciones
-run "cd '$DEP' && make migrate" && ok "Base de datos migrada." \
+# Migraciones (exec directo en el contenedor, sin depender de make/scripts)
+run "cd '$DEP' && docker compose exec -T watcher python manage.py migrate" \
+    && ok "Base de datos migrada." \
     || warn "La migración devolvió un aviso; revísalo si el panel no carga."
 
 # Superusuario (no interactivo)
