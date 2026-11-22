@@ -111,17 +111,22 @@ else
     ok "Docker ya está instalado."
 fi
 
-# Plugin de compose v2 (el subcomando 'docker compose')
+# Plugin de compose v2 (el subcomando 'docker compose').
+# En Kali no existe el paquete apt, así que instalamos el plugin oficial de Docker.
 if docker compose version >/dev/null 2>&1; then
     ok "Docker Compose disponible."
 else
-    warn "Falta 'docker compose'. Instalando el plugin..."
-    $APT install -y -qq docker-compose-v2 2>/dev/null \
-        || $APT install -y -qq docker-compose-plugin 2>/dev/null || true
+    warn "Instalando el plugin oficial 'docker compose'..."
+    CLI_DIR="/usr/local/lib/docker/cli-plugins"
+    $SUDO mkdir -p "$CLI_DIR"
+    $SUDO curl -fsSL \
+        "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" \
+        -o "$CLI_DIR/docker-compose"
+    $SUDO chmod +x "$CLI_DIR/docker-compose"
     if docker compose version >/dev/null 2>&1; then
         ok "Docker Compose disponible."
     else
-        die "No se pudo habilitar 'docker compose'. Instala a mano: sudo apt install -y docker.io docker-compose-v2"
+        die "No se pudo habilitar 'docker compose'."
     fi
 fi
 
