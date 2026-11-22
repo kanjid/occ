@@ -47,6 +47,10 @@ trap 'die "Ha fallado el paso anterior (línea $LINENO). Revisa el mensaje de ar
 # sudo solo si no somos root
 if [ "$(id -u)" -eq 0 ]; then SUDO=""; else SUDO="sudo"; fi
 
+# apt SIEMPRE en modo no interactivo. Usamos 'env' porque sudo no hereda
+# las variables de entorno del shell (por eso debconf preguntaba por pantalla).
+APT="$SUDO env DEBIAN_FRONTEND=noninteractive apt-get"
+
 # -------------------------- 1. Comprobaciones -------------------------------
 step "1/6 · Comprobando el sistema"
 
@@ -71,15 +75,22 @@ if command -v curl >/dev/null 2>&1; then
         && ok "Hay salida a internet." \
         || die "Sin acceso a internet (github.com). La VM necesita red para instalarse."
 else
-    $SUDO apt-get update -qq && $SUDO apt-get install -y -qq curl \
+    $APT update -qq && $APT install -y -qq curl \
         || die "No se pudo instalar 'curl'."
 fi
 
 # Paquetes base
 step "Instalando utilidades base (git, curl, python3-venv)"
-export DEBIAN_FRONTEND=noninteractive
-$SUDO apt-get update -qq
-$SUDO apt-get install -y -qq git curl ca-certificates python3 python3-venv python3-pip openssl
+# Limpia un repositorio de Docker roto que pudiera haber dejado un intento
+# anterior: get.docker.com añade 'kali-rolling', que Docker NO publica y
+# hace fallar 'apt-get update'. En Kali usamos docker.io de sus propios repos.
+if [ -f /etc/apt/sources.list.d/docker.list ] \
+   && grep -q 'download.docker.com' /etc/apt/sources.list.d/docker.list 2>/dev/null; then
+    $SUDO rm -f /etc/apt/sources.list.d/docker.list
+    warn "Eliminado un repositorio de Docker incompatible de un intento previo."
+fi
+$APT update -qq
+$APT install -y -qq git curl ca-certificates python3 python3-venv python3-pip openssl
 ok "Utilidades base listas."
 
 # -------------------------- 2. Docker ---------------------------------------
@@ -89,7 +100,7 @@ step "2/6 · Docker y Docker Compose"
 # el script oficial get.docker.com NO soporta 'kali-rolling' y falla.
 if ! command -v docker >/dev/null 2>&1; then
     warn "Docker no está instalado. Instalando desde los repositorios de Kali..."
-    if $SUDO apt-get install -y -qq docker.io; then
+    if $APT install -y -qq docker.io; then
         ok "Docker instalado (docker.io)."
     else
         warn "No pude instalar 'docker.io'; probando el script oficial de Docker..."
@@ -105,8 +116,8 @@ if docker compose version >/dev/null 2>&1; then
     ok "Docker Compose disponible."
 else
     warn "Falta 'docker compose'. Instalando el plugin..."
-    $SUDO apt-get install -y -qq docker-compose-v2 2>/dev/null \
-        || $SUDO apt-get install -y -qq docker-compose-plugin 2>/dev/null || true
+    $APT install -y -qq docker-compose-v2 2>/dev/null \
+        || $APT install -y -qq docker-compose-plugin 2>/dev/null || true
     if docker compose version >/dev/null 2>&1; then
         ok "Docker Compose disponible."
     else
