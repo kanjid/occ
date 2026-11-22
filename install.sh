@@ -152,10 +152,13 @@ else
     RUNMODE="sudo"
 fi
 run() {  # run "<comando de shell>"
+    # IMPORTANTE: la entrada se redirige desde /dev/null. Al ejecutar el
+    # instalador con 'curl | bash', stdin ES el propio script; sin esto,
+    # 'docker compose exec' consumiría el resto del script y lo cortaría.
     case "$RUNMODE" in
-        direct) bash -lc "$1" ;;
-        sg)     sg docker -c "$1" ;;
-        sudo)   $SUDO bash -lc "$1" ;;
+        direct) bash -lc "$1" </dev/null ;;
+        sg)     sg docker -c "$1" </dev/null ;;
+        sudo)   $SUDO bash -lc "$1" </dev/null ;;
     esac
 }
 ok "Docker operativo (modo de ejecución: $RUNMODE)."
